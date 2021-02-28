@@ -738,7 +738,7 @@ private:
   // example, it would be bad to add an RTT in a tuple, as that would force us
   // to use temporary locals for the tuple, but RTTs are not defaultable.
   bool canBeArbitrarilyReplaced(Expression* curr) {
-    return curr->type.isDefaultable();
+    return curr->type.isDefaultable() && FindAll<Pop>(curr).list.empty();
   }
 
   void recombine(Function* func) {
@@ -798,8 +798,11 @@ private:
           // Replace it!
           auto& candidates = scanner.exprsByType[curr->type];
           assert(!candidates.empty()); // this expression itself must be there
-          replaceCurrent(
-            ExpressionManipulator::copy(parent.pick(candidates), wasm));
+          auto* replacement = parent.pick(candidates);
+          if (parent.canBeArbitrarilyReplaced(replacement)) {
+            replaceCurrent(
+              ExpressionManipulator::copy(replacement, wasm));
+          }
         }
       }
     };
@@ -885,7 +888,6 @@ private:
 #define DELEGATE_FIELD_LITERAL(id, name)
 #define DELEGATE_FIELD_NAME(id, name)
 #define DELEGATE_FIELD_NAME_VECTOR(id, name)
-#define DELEGATE_FIELD_SCOPE_NAME_USE_VECTOR(id, name)
 #define DELEGATE_FIELD_SIGNATURE(id, name)
 #define DELEGATE_FIELD_TYPE(id, name)
 #define DELEGATE_FIELD_ADDRESS(id, name)
@@ -911,18 +913,34 @@ private:
         Index i = controlFlowStack.size() - 1;
         while (1) {
           auto* curr = controlFlowStack[i];
-          if (auto* block = curr->dynCast<Block>()) {
-            if (name == block->name) {
-              return true;
-            }
-          } else if (auto* loop = curr->dynCast<Loop>()) {
-            if (name == loop->name) {
-              return true;
-            }
-          } else {
-            // an if or a try, ignorable
-            assert(curr->is<If>() || curr->is<Try>());
-          }
+
+#define DELEGATE_ID curr->_id
+
+#define DELEGATE_START(id)                                                     \
+  auto* cast = curr->cast<id>();                                               \
+  WASM_UNUSED(cast);
+
+#define DELEGATE_GET_FIELD(id, name) cast->name
+
+#define DELEGATE_FIELD_SCOPE_NAME_DEF(id, name)                                \
+  if (name == cast->name) {                                                    \
+    return true;                                                               \
+  }
+
+#define DELEGATE_FIELD_CHILD(id, name)
+#define DELEGATE_FIELD_OPTIONAL_CHILD(id, name)
+#define DELEGATE_FIELD_INT(id, name)
+#define DELEGATE_FIELD_INT_ARRAY(id, name)
+#define DELEGATE_FIELD_LITERAL(id, name)
+#define DELEGATE_FIELD_NAME(id, name)
+#define DELEGATE_FIELD_NAME_VECTOR(id, name)
+#define DELEGATE_FIELD_SCOPE_NAME_USE(id, name)
+#define DELEGATE_FIELD_SIGNATURE(id, name)
+#define DELEGATE_FIELD_TYPE(id, name)
+#define DELEGATE_FIELD_ADDRESS(id, name)
+
+#include "wasm-delegations-fields.h"
+
           if (i == 0) {
             return false;
           }

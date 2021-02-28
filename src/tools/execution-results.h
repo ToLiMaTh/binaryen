@@ -207,6 +207,8 @@ struct ExecutionResults {
       return instance.callFunction(func->name, arguments);
     } catch (const TrapException&) {
       return {};
+    } catch (const WasmException&) {
+      return {};
     }
   }
 };

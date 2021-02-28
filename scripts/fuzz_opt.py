@@ -153,6 +153,10 @@ def randomize_fuzz_settings():
 IMPORTANT_INITIAL_CONTENTS = [
     os.path.join('lit', 'passes', 'optimize-instructions.wast'),
     os.path.join('passes', 'optimize-instructions_fuzz-exec.wast'),
+    os.path.join('break-within-catch.wasm'),
+    os.path.join('br_to_try.wasm'),
+    os.path.join('exception-handling.wast'),
+    os.path.join('reference-types.wast'),
 ]
 IMPORTANT_INITIAL_CONTENTS = [os.path.join(shared.get_test_dir('.'), t) for t in IMPORTANT_INITIAL_CONTENTS]
 
@@ -186,7 +190,9 @@ def pick_initial_contents():
         # corner cases of escaping of names is not interesting
         'names.wast',
         # huge amount of locals that make it extremely slow
-        'too_much_for_liveness.wasm'
+        'too_much_for_liveness.wasm',
+        # https://github.com/WebAssembly/binaryen/issues/3629
+        'try-delegate.wasm',
     ]:
         print('initial contents is disallowed')
         return
@@ -209,8 +215,6 @@ def pick_initial_contents():
 
     global FEATURE_OPTS
     FEATURE_OPTS += [
-        # has not been enabled in the fuzzer yet
-        '--disable-exception-handling',
         # has not been fuzzed in general yet
         '--disable-memory64',
         # has not been fuzzed in general yet
@@ -611,7 +615,7 @@ class CompareVMs(TestCaseHandler):
                 compare(before[vm], after[vm], 'CompareVMs between before and after: ' + vm.name)
 
     def can_run_on_feature_opts(self, feature_opts):
-        return all([x in feature_opts for x in ['--disable-simd', '--disable-reference-types', '--disable-exception-handling', '--disable-multivalue', '--disable-gc']])
+        return all([x in feature_opts for x in ['--disable-simd', '--disable-reference-types', '--disable-multivalue', '--disable-gc']])
 
 
 # Check for determinism - the same command must have the same output.
@@ -857,7 +861,7 @@ def test_one(random_input, given_wasm):
     else:
         # emit the target features section so that reduction can work later,
         # without needing to specify the features
-        generate_command = [in_bin('wasm-opt'), random_input, '-ttf', '-o', 'a.wasm', '--emit-target-features'] + FUZZ_OPTS + FEATURE_OPTS
+        generate_command = [in_bin('wasm-opt'), random_input, '-ttf', '-o', 'a.wasm'] + FUZZ_OPTS + FEATURE_OPTS
         if INITIAL_CONTENTS:
             generate_command += ['--initial-fuzz=' + INITIAL_CONTENTS]
         if PRINT_WATS:
@@ -1133,12 +1137,16 @@ on valid wasm files.)
                 with open('reduce.sh', 'w') as reduce_sh:
                     reduce_sh.write('''\
 # check the input is even a valid wasm file
+echo "At least one of the next two values should be 0:"
 %(wasm_opt)s --detect-features %(temp_wasm)s
-echo "should be 0:" $?
+echo "  " $?
+%(wasm_opt)s --all-features %(temp_wasm)s
+echo "  " $?
 
 # run the command
+echo "The following value should be 1:"
 ./scripts/fuzz_opt.py --binaryen-bin %(bin)s %(seed)d %(temp_wasm)s > o 2> e
-echo "should be 1:" $?
+echo "  " $?
 
 #
 # You may want to print out part of "o" or "e", if the output matters and not
@@ -1195,10 +1203,17 @@ vvvv
 ^^^^
 ||||
 
-Make sure to verify by eye that the output says
+Make sure to verify by eye that the output says something like this:
 
-should be 0: 0
-should be 1: 1
+At least one of the next two values should be 0:
+  0
+  1
+The following value should be 1:
+  1
+
+(If it does not, then one possible issue is that -ttf fails to write a valid
+binary. If so, you can print the output of ttf in text form and run the
+reduction from that, passing --text to the reducer.)
 
 You can also read "%(reduce_sh)s" which has been filled out for you and includes
 docs and suggestions.

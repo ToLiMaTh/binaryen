@@ -562,6 +562,10 @@ struct Reducer
         tryToReplaceCurrent(loop->body);
       }
       return; // nothing more to do
+    } else if (curr->is<Try>()) {
+      // Don't continue down to replace a Try with a child, as it may cause a
+      // pop to move to an invalid place.
+      return;
     }
     // Finally, try to replace with a child.
     for (auto* child : ChildIterator(curr)) {
