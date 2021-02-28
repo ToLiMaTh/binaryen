@@ -151,8 +151,8 @@ def randomize_fuzz_settings():
 
 
 IMPORTANT_INITIAL_CONTENTS = [
-    os.path.join('lit', 'passes', 'optimize-instructions.wast'),
-    os.path.join('passes', 'optimize-instructions_fuzz-exec.wast'),
+    #os.path.join('lit', 'passes', 'optimize-instructions.wast'),
+    #os.path.join('passes', 'optimize-instructions_fuzz-exec.wast'),
     os.path.join('break-within-catch.wasm'),
     os.path.join('br_to_try.wasm'),
     os.path.join('exception-handling.wast'),
@@ -168,7 +168,7 @@ def pick_initial_contents():
 
     INITIAL_CONTENTS = None
     # half the time don't use any initial contents
-    if random.random() < 0.5:
+    if random.random() < 0:#.5:
         return
     # some of the time use initial contents that are known to be especially
     # important

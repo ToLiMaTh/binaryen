@@ -914,6 +914,8 @@ private:
         while (1) {
           auto* curr = controlFlowStack[i];
 
+// TODO: use operateOn*
+
 #define DELEGATE_ID curr->_id
 
 #define DELEGATE_START(id)                                                     \
